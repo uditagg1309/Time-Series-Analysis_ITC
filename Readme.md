@@ -3,6 +3,6 @@ This repository contains the code and documentation for a time series analysis o
 
 ## Files
 
-- `analysis.Rmd`: R Markdown file containing the code and detailed analysis steps.
-- `analysis.html`: HTML file generated from the R Markdown file for easy online viewing.
-- `analysis.pdf`: PDF file containing a printable version of the analysis report.
+- `Code_R Notebook.Rmd`: R Markdown file containing the code and detailed analysis steps.
+- `Report_and_Output.html`: HTML file generated from the R Markdown file for easy online viewing.
+- `Output_Report.pdf`: PDF file containing a printable version of the analysis report.
