@@ -1,0 +1,332 @@
+---
+title: "Udit_52A_Project 2_Time series analysis"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# # Required Packages
+packages = c('quantmod','car','forecast','tseries','FinTS', 'rugarch','utf8','ggplot2')
+# 
+# # Install all Packages with Dependencies
+# install.packages(packages, dependencies = TRUE)
+# 
+# # Load all Packages
+lapply(packages, require, character.only = TRUE)
+
+
+
+getSymbols(Symbols = 'ITC', 
+           src = 'yahoo', 
+           from = as.Date('2018-01-01'), 
+           to = as.Date('2023-12-31'),
+           periodicity = 'daily')
+
+
+ITC_price = na.omit(ITC$ITC.Adjusted) # Adjusted Closing Price
+class(ITC_price) # xts (Time-Series) Object
+ITC_return = na.omit(diff(log(ITC_price))); plot(ITC_return)
+
+```
+Analysis:
+Objective: To analyze the daily returns of ITC stock from 2018-01-01 to 2023-12-31.
+Analysis: Extracted the adjusted closing prices of ITC stock, calculated daily returns, and visualized them.
+Result:
+The 'ITC_return' plot displays the daily returns of ITC stock over the specified period.
+Implication: 
+The plot indicates the volatility and direction of daily returns for ITC stock during the given timeframe.
+Observations from the plot can help investors understand the historical performance and risk associated with ITC stock.
+
+```{r}
+
+#ADF test for Stationery
+
+adf_test_jj = adf.test(ITC_return); adf_test_jj
+
+```
+Analysis:
+
+Objective: To conduct an Augmented Dickey-Fuller (ADF) test for stationarity on the daily returns of ITC stock.
+Analysis: Performed the ADF test using the 'adf.test' function and obtained results.
+Result:
+The Augmented Dickey-Fuller test for stationarity on ITC daily returns yields the following results:
+  - Dickey-Fuller statistic: -13.558
+  - Lag order: 10
+  - p-value: 0.01
+  - Alternative hypothesis: Stationary
+
+Implication: 
+The ADF test suggests that the daily returns of ITC stock are likely stationary. The small p-value (0.01) indicates evidence against the null hypothesis of non-stationarity. Therefore, we have reason to believe that the ITC stock returns exhibit stationarity, which is important for certain time series analyses.
+
+
+```{r}
+#Autocorrelation test
+# Ljung-Box Test for Autocorrelation
+lb_test_ds = Box.test(ITC_return); lb_test_ds
+#If autocorrelation exists then autoARIMA
+
+```
+
+Analysis:
+
+Objective: To perform a Ljung-Box test for autocorrelation on the daily returns of ITC stock.
+Analysis: Conducted the Ljung-Box test using the 'Box.test' function and obtained results.
+Result:
+The Ljung-Box test for autocorrelation on ITC daily returns yields the following results:
+  - X-squared statistic: 249.43
+  - Degrees of freedom: 1
+  - p-value: < 2.2e-16
+
+Implication:
+The Ljung-Box test indicates significant autocorrelation in the ITC stock daily returns. The small p-value (< 2.2e-16) suggests evidence against the null hypothesis of no autocorrelation.
+
+Action:
+Given the presence of autocorrelation, it may be advisable to consider an autoARIMA model for time series forecasting. AutoARIMA can help in automatically selecting an appropriate ARIMA model with differencing to account for the observed autocorrelation.
+
+
+```{r}
+#ACF and PCF
+
+acf(ITC_price) # ACF of JJ Series
+pacf(ITC_price) # PACF of JJ Series
+
+acf(ITC_return) # ACF of JJ Difference (Stationary) Series
+pacf(ITC_return) # PACF of JJ Difference (Stationary) Series
+
+
+```
+```{r}
+#AutoArima
+arma_pq_ds = auto.arima(ITC_return); arma_pq_ds
+arma_pq = auto.arima(ITC_price); arma_pq
+
+```
+Analysis:
+
+Objective: To perform autoARIMA modeling on the daily returns ('ITC_return') and adjusted closing prices ('ITC_price') of ITC stock.
+Analysis: Used the 'auto.arima' function to automatically select the ARIMA model for both returns and prices.
+Results:
+
+For Daily Returns ('ITC_return'):
+The autoARIMA model suggests an ARIMA(5,0,4) with zero mean.
+Coefficients:
+  - AR: ar1 to ar5
+  - MA: ma1 to ma4
+  - sigma^2 (variance) = 3.472
+  - Log likelihood = -2137.57
+  - AIC = 4295.14, AICc = 4295.35, BIC = 4344.68
+
+For Adjusted Closing Prices ('ITC_price'):
+The autoARIMA model suggests an ARIMA(5,0,3) with a non-zero mean.
+Coefficients:
+  - AR: ar1 to ar5
+  - MA: ma1 to ma3
+  - Mean: mean term
+  - sigma^2 (variance) = 17762756
+  - Log likelihood = -10240.9
+  - AIC = 20501.81, AICc = 20502.02, BIC = 20551.36
+
+Implication:
+The autoARIMA models provide a statistical framework to capture the underlying patterns in both daily returns and adjusted closing prices of ITC stock. These models can be used for forecasting future values, and the AIC, AICc, and BIC values help in model comparison.
+
+Note: Interpretation of the coefficients and model selection details may require further analysis based on the specific context of the financial data.
+
+```{r}
+#Arima manuplation
+arma13 = arima(ITC_return, order = c(5, 0, 4)); arma13
+ds_fpq = forecast(arma13, h = 500)
+plot(ds_fpq)
+```
+Analysis:
+
+Objective: To fit an ARIMA(5, 0, 4) model to the daily returns ('ITC_return') of ITC stock and generate forecasts.
+Analysis: Used the 'arima' function to fit the ARIMA model and the 'forecast' function to generate forecasts.
+Results:
+
+ARIMA Model (5, 0, 4):
+Coefficients:
+  - AR: ar1 to ar5
+  - MA: ma1 to ma4
+  - Intercept term
+  - sigma^2 (variance) estimated as 3.437
+  - Log likelihood = -2136.71
+  - AIC = 4295.42
+
+Forecasting:
+Generated forecasts for the next 500 time points using the fitted ARIMA model.
+
+Plot:
+The plot displays the original time series of daily returns along with the forecasted values.
+
+Implication:
+The ARIMA(5, 0, 4) model is fitted to the historical daily returns of ITC stock, providing insights into the underlying patterns. The generated forecast can be used for future predictions, and the plot visually represents the model's performance.
+
+Note: Interpretation of coefficients and model evaluation details may require further analysis based on the specific context of the financial data.
+
+
+```{r}
+#Autocorrelation test
+# Ljung-Box Test for Autocorrelation
+lb_test_ds_A = Box.test(arma13$residuals); lb_test_ds_A
+#After this no autocorrelation exists
+
+```
+Analysis:
+
+Objective: To perform a Ljung-Box test for autocorrelation on the residuals of the ARIMA(5, 0, 4) model.
+Analysis: Conducted the Ljung-Box test using the 'Box.test' function on the residuals of the ARIMA model and obtained results.
+Results:
+
+Ljung-Box Test for Autocorrelation on Residuals:
+  - X-squared statistic: 0.00079355
+  - Degrees of freedom: 1
+  - p-value: 0.9775
+
+Implication:
+The Ljung-Box test indicates no significant autocorrelation in the residuals of the ARIMA(5, 0, 4) model. The high p-value (0.9775) suggests that there is no evidence against the null hypothesis of no autocorrelation.
+
+Action:
+The absence of autocorrelation in residuals is a positive outcome, indicating that the ARIMA model adequately captures the temporal patterns in the time series.
+
+Note: Interpretation may vary based on the specific context of the financial data and the assumptions underlying the time series analysis.
+
+```{r}
+# Test for Volatility Clustering or Heteroskedasticity: Box Test 
+stk_ret_sq = arma13$residuals^2 # Return Variance (Since Mean Returns is approx. 0)
+plot(stk_ret_sq)
+stk_ret_sq_box_test = Box.test(stk_ret_sq, lag = 10) # H0: Return Variance Series is Not Serially Correlated
+stk_ret_sq_box_test # Inference : Return Variance Series is Heteroskedastic (Has Volatility Clustering)
+
+# Test for Volatility Clustering or Heteroskedasticity: ARCH Test
+stk_ret_arch_test = ArchTest(arma13$residuals, lags = 10) # H0: No ARCH Effects
+stk_ret_arch_test # Inference : Return Series is Heteroskedastic (Has Volatility Clustering)
+
+```
+
+Analysis:
+Objective: To test for volatility clustering or heteroskedasticity in the residuals of the ARIMA(5, 0, 4) model.
+Analysis: Conducted Box test and ARCH test on the squared residuals to assess the presence of volatility clustering.
+Results:
+
+1. Box Test for Volatility Clustering:
+   - X-squared statistic: 255.22
+   - Degrees of freedom: 10
+   - p-value: < 2.2e-16
+   Inference: The Box test indicates significant evidence against the null hypothesis, suggesting that the return variance series exhibits volatility clustering or heteroskedasticity.
+
+2. ARCH Test for Volatility Clustering:
+   - Chi-squared statistic: 173.96
+   - Degrees of freedom: 10
+   - p-value: < 2.2e-16
+   Inference: The ARCH test also provides strong evidence against the null hypothesis, supporting the presence of ARCH effects in the return series. This implies that the returns have volatility clustering.
+
+Implication:
+The results from both tests suggest that the residuals of the ARIMA(5, 0, 4) model exhibit volatility clustering or heteroskedasticity. Understanding and accounting for this pattern in volatility is essential for risk management and forecasting.
+
+Note: Interpretation may vary based on the specific context of the financial data and the assumptions underlying the time series analysis.
+
+
+```{r}
+#Garch model
+garch_model1 = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(0,0), include.mean = TRUE))
+nse_ret_garch1 = ugarchfit(garch_model1, data = arma13$residuals); nse_ret_garch1
+
+garch_model2 = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(4,5), include.mean = FALSE))
+nse_ret_garch2 = ugarchfit(garch_model2, data = arma13$residuals); nse_ret_garch2
+
+# Test for Volatility Clustering or Heteroskedasticity: ARCH Test
+gar_resd = residuals(nse_ret_garch2)^2
+stk_ret_arch_test1 = ArchTest(gar_resd, lags = 1) # H0: No ARCH Effects
+stk_ret_arch_test1 # Inference : Return Series is Heteroskedastic (Has Volatility Clustering)
+```
+Analysis:
+Objective: To fit GARCH models to the residuals of the ARIMA(5, 0, 4) model and test for volatility clustering.
+Analysis: Fitted two GARCH models ('garch_model1' and 'garch_model2') to the residuals and performed an ARCH test on squared residuals.
+Results:
+
+1. GARCH Model 1:
+   - sGARCH(1,1) model with ARFIMA(0,0,0) mean.
+   - Optimal Parameters:
+      - mu (Mean): 0.064777
+      - omega: 0.048578
+      - alpha1: 0.026597
+      - beta1: 0.958516
+   - Log likelihood: -2079.392
+   - Weighted Ljung-Box Test on Standardized Residuals and Squared Residuals show significant autocorrelation.
+   - Weighted ARCH LM Tests indicate evidence of ARCH effects.
+
+2. GARCH Model 2:
+   - sGARCH(1,1) model with ARFIMA(4,5,0) mean.
+   - Optimal Parameters are similar to Model 1.
+   - Log likelihood: -2079.392
+   - Weighted Ljung-Box Test and Weighted ARCH LM Tests show evidence of autocorrelation and ARCH effects.
+
+ARCH Test on Squared Residuals:
+   - Lag[1] statistic: 49.07
+   - Lag[2*(p+q)+(p+q)-1][5] statistic: 57.97
+   - Lag[4*(p+q)+(p+q)-1][9] statistic: 70.25
+   - p-value: < 2.2e-16
+   Inference: The ARCH test confirms the presence of volatility clustering or heteroskedasticity in the residuals.
+
+Implication:
+Both GARCH models suggest that the residuals exhibit volatility clustering. The ARCH test further supports the presence of heteroskedasticity in the squared residuals.
+
+Note: Interpretation may vary based on the specific context of the financial data and the assumptions underlying the time series analysis.
+
+
+```{r}
+
+garch_modelf = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(4,5), include.mean = FALSE))
+stk_ret_garch = ugarchfit(garch_modelf, data = ITC_return); stk_ret_garch
+```
+Analysis:
+
+Objective: To fit a GARCH model to the daily returns of ITC stock and assess the goodness-of-fit using the Adjusted Pearson Goodness-of-Fit Test.
+Analysis: Used the 'ugarchspec' and 'ugarchfit' functions to fit a GARCH model and performed the Adjusted Pearson Goodness-of-Fit Test.
+Results:
+
+GARCH Model:
+   - sGARCH(1,1) model with ARFIMA(4,5,0) mean.
+   - Optimal Parameters are not provided in the output.
+
+Adjusted Pearson Goodness-of-Fit Test:
+   - The test was performed for different group sizes (20, 30, 40, and 50).
+   - For each group size, the test statistic and p-value were calculated.
+   - All p-values are extremely low (e.g., 3.193e-60), indicating strong evidence against the null hypothesis of a good fit.
+
+Implication:
+The Adjusted Pearson Goodness-of-Fit Test suggests that the fitted GARCH model may not provide a good fit to the observed daily returns of ITC stock. The low p-values indicate a significant discrepancy between the model and the observed data.
+
+Note: Interpretation may vary based on the specific context of the financial data and the assumptions underlying the time series analysis.
+
+
+```{r}
+# GARCH Forecast
+stk_ret_garch_forecast1 = ugarchforecast(stk_ret_garch, n.ahead = 50); stk_ret_garch_forecast1
+```
+Objective: To forecast volatility using the fitted GARCH model for the next 50 time points.
+Analysis: Used the 'ugarchforecast' function to generate volatility forecasts for the next 50 time points.
+Results:
+
+GARCH Model Forecast:
+   - Model: sGARCH
+   - Horizon: 50
+   - Roll Steps: 0
+   - Out of Sample: 0
+
+0-roll forecast [T0=2022-03-02]:
+   - Forecasted Series:
+      - T+1 to T+50: Contains forecasted values of volatility (Sigma) for each time point.
+
+Implication:
+The forecasted values represent the predicted volatility for the next 50 time points based on the fitted GARCH model. These forecasts can be useful for risk management and decision-making, providing insights into the expected future volatility of the financial time series.
+
+
+
+```{r}
+plot(stk_ret_garch_forecast1)
+```
+
