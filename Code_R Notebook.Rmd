@@ -1,0 +1,229 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+---
+title: "Untitled"
+author: "Udit Aggarwal"
+date: "2024-03-21"
+output: html_document
+---
+Ctrl + Alt + I to add chunk
+
+```{r}
+#Installing required packages
+packages = c('quantmod','car','forecast','tseries','FinTS', 'rugarch','utf8','ggplot2')
+lapply(packages, require, character.only = TRUE)
+
+```
+
+```{r}
+#Downloading the required data
+
+getSymbols(Symbols = 'ITC', 
+           src = 'yahoo', 
+           from = as.Date('2012-01-01'), 
+           to = as.Date('2023-12-31'),
+           periodicity = 'daily')
+
+data_price = na.omit(ITC$ITC.Adjusted)
+class(data_price) # xts (Time-Series) Object
+data_return = na.omit(diff(log(data_price))); plot(data_return)
+
+
+```
+
+Report:
+
+Objective: To analyze the daily returns of stock from 2012-01-01 to 2023-12-31. 
+
+Analysis: Extracted the adjusted closing prices of data stock, calculated daily returns, and visualized them. 
+
+Result: The 'data_return' plot displays the daily returns of stock over the specified period. 
+
+Implication: The plot indicates the volatility and direction of daily returns for stock during the given timeframe.
+
+
+```{r}
+#Checking the stationarity of returns
+adf_test = adf.test(data_return); adf_test
+
+
+```
+Report:
+
+Objective: To conduct an Augmented Dickey-Fuller (ADF) test for stationarity on the daily returns of stock.
+
+Analysis: Performed the ADF test using the 'adf.test' function and obtained results.
+
+Result: The Augmented Dickey-Fuller test for stationarity on data daily returns yields the following p-value: 0.01 - with Null hypothesis that data is non-stationary and Alternate hypothesis that data is stationery.
+
+Implication: The ADF test suggests that the daily returns of data stock are likely stationary. The small p-value (0.01) indicates evidence against the null hypothesis of non-stationarity. Therefore, we reject the null hypothesis and conclude that data is Non-stationary.
+
+
+```{r}
+#Check for Autocorrlation in Data
+# Ljung-Box Test for Autocorrelation
+lb_test = Box.test(data_return); lb_test
+
+```
+Report:
+
+Objective: To perform a Ljung-Box test for autocorrelation on the daily returns of stock. 
+
+Analysis: Conducted the Ljung-Box test using the 'Box.test' function and obtained results. 
+
+Result: The Ljung-Box test for autocorrelation on data daily returns yields the following p-value: 2.2e-16 with null hypothesis that data is not autocorrelated and alternate hypothesis that data is autocorrelated.
+
+Implication: The Ljung-Box test indicates significant autocorrelation in the data. The small p-value (2.2e-16) suggests evidence to reject the the null hypothesis and data has autocorrelation.Now, we need to use arima to remodel the data.
+
+```{r}
+#Plot of ACF and PCF
+acf(data_return) 
+pacf(data_return) 
+
+```
+
+Report:
+
+Objective: To plot acf and pacf of data to determine p lags and q lags.
+
+Analysis: We use acf and Pacf function of R to plot. Model used is ARIMA i.e. AR (p-Lag) Model : y(t) = c1 + a1*y(t-1) + a2*y(t-2) + ... + ap*y(t-p) + e(t) where e = error == White Noise | AR-1 Model : y(t) = c + a1*y(t-1) + e(t), MA (q-Lag) Model : y(t) = c2 + b1*e(t-1) + b2*e(t-2) + ... + bp*e(t-p) where e = Error == White Noise | MA-1 Model : y(t) = d + b1*e(t-1), ARMA (p, q) Model : y(t) = c + a1*y(t-1) + ... + ap*y(t-p) + b1*e(t-1) + ... + bp*e(t-p) + e(t) | ARMA (1, 1)
+
+Result: Acf shows correlation between series and its lagged value, however pacf shows correlation between series and its lagged value after removing effects of intervening lags. Blueline shows 95% values lie between them. 
+
+Implication: Using ACF plot we can interpret that first spike between blue lines come at near 4, So q lag is 4 while similarly in PACF plot it is at 5, So, P lag is 5. So, according to plots arima order should be (5,0,4)
+
+
+```{r}
+#Using Auto arima 
+arma_pq = auto.arima(data_return); arma_pq
+
+```
+
+Report:
+
+Objective: To remodel data using auto arima.
+
+Analysis: We use "auto.arima" function of R to plot.
+
+Result: It also shows same lags as we identified before.
+
+Implication: Now we will use transformed data for further analysis.
+
+
+```{r}
+#Checking of Autocorrelation in transformed data after auto arima
+lb_test_A = Box.test(arma_pq$residuals); lb_test_A
+
+```
+
+
+Report:
+
+Objective: To perform a Ljung-Box test for autocorrelation on the transformed data. 
+
+Analysis: Conducted the Ljung-Box test using the 'Box.test' function and obtained results. 
+
+Result: The Ljung-Box test for autocorrelation yields the following p-value: 0.4154 with null hypothesis that data is not autocorrelated and alternate hypothesis that data is autocorrelated.
+
+Implication: The Ljung-Box test indicates no significant autocorrelation in the data. The p-value (0.4154) suggests evidence to accept the the null hypothesis and data has no autocorrelation now.
+
+
+```{r}
+#Forecast of Arima model
+ds_fpq = forecast(arma_pq, h = 500)
+plot(ds_fpq)
+
+```
+
+Report:
+
+Objective: To forecast the prices using arima model.
+
+Analysis: For this, the forecast function of R is used.
+
+Result: Plot shows the prediction of next 500 steps, which means as we had daily data. It shows prediction for next 500 days.
+
+Implication: This plot shows that data will be steadily constant over time as it is reflected in historical data.
+
+
+```{r}
+#Checking for Volatility Clustering or Heteroskedasticity: Arch test
+
+data_ret_sq = arma_pq$residuals^2
+data_ret_arch_test = ArchTest(data_ret_sq, lags = 10) 
+data_ret_arch_test
+```
+
+Report:
+
+Objective: To test for volatility clustering or heteroskedasticity in the residuals of the ARIMA(5, 0, 4) model. 
+
+Analysis: Conducted Box ARCH test on the squared residuals to assess the presence of volatility clustering. 
+
+Results: Arch test yields the p value of 2.2e-16, with null hypothesis that there is no arch effect and alternate hypothesis tells presence of Arch effect.
+
+Implications: It means we can reject null hypothesis and it means data contains Volatility Clustering or Heteroskedasticity, which mean we need to do garch modelling to transform data to white noise.
+
+
+```{r}
+#Garch Modelling
+garch_model1 = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(5,4), include.mean = TRUE))
+ret_garch1 = ugarchfit(garch_model1, data = data_ret_sq); ret_garch1
+
+```
+
+
+
+Report:
+
+Objective: To transform the data to remove volatility clustering or heteroskedasticity.
+
+Analysis: We used ugarchfit and ugarchspec to do this.
+
+Result: We found the data with following characterstics: Sign Bias:	2.4628779	, Negative Sign Bias:	0.4037908	Positive Sign Bias	4.5236680, Joint Effect	20.7276940
+
+Implication: Now, we can ue this data forecasting.
+
+```{r}
+stk_ret_garch_forecast1 = ugarchforecast(ret_garch1, n.ahead = 500); stk_ret_garch_forecast1
+
+```
+
+
+
+
+```{r}
+plot(stk_ret_garch_forecast1)
+```
+
+
+
+Report:
+
+Objective: To predict future values using garch model
+
+Analysis: We used "forecast" and "Plot" fuction of R.
+
+Result: It predicts constant stock return in future.
+
+Implication: It can be used to predict stock may not have growth prospects in future.
+
+
+
+
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
